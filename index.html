@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kamera App</title>
+
+<link rel="manifest" href="manifest.json">
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #111;
+    color: white;
+    text-align: center;
+}
+video, canvas {
+    width: 100%;
+    max-width: 420px;
+    border-radius: 10px;
+}
+button {
+    margin: 5px;
+    padding: 10px 15px;
+    font-size: 14px;
+}
+</style>
+</head>
+<body>
+
+<h2>Kamera App</h2>
+
+<video id="video" autoplay playsinline></video>
+<canvas id="canvas" hidden></canvas>
+
+<br>
+<button onclick="startCamera()">Kamera</button>
+<button onclick="switchCamera()">Switch</button>
+<button onclick="takePhoto()">Foto</button>
+<button onclick="startRecord()">Rekam</button>
+<button onclick="stopRecord()">Stop</button>
+
+<script>
+let stream;
+let recorder;
+let chunks = [];
+let useBackCamera = true;
+
+async function startCamera() {
+    if (stream) stream.getTracks().forEach(t => t.stop());
+
+    stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useBackCamera ? "environment" : "user" },
+        audio: true
+    });
+
+    video.srcObject = stream;
+}
+
+function switchCamera() {
+    useBackCamera = !useBackCamera;
+    startCamera();
+}
+
+function takePhoto() {
+    const canvas = document.getElementById("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+
+    const link = document.createElement("a");
+    link.download = "foto.png";
+    link.href = canvas.toDataURL();
+    link.click();
+}
+
+function startRecord() {
+    recorder = new MediaRecorder(stream);
+    chunks = [];
+
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = () => {
+        const blob = new Blob(chunks, { type: "video/mp4" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "video.mp4";
+        a.click();
+    };
+
+    recorder.start();
+}
+
+function stopRecord() {
+    if (recorder) recorder.stop();
+}
+
+// Service Worker
+if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
