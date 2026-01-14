@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kamera App - UI Modern</title>
+<link rel="manifest" href="manifest.json">
+
+<style>
+  body {
+    margin: 0;
+    font-family: Arial, sans-serif;
+    background: #000;
+    height: 100vh;
+    overflow: hidden;
+    position: relative;
+  }
+
+  video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  /* Floating Controls Container */
+  .controls {
+    position: absolute;
+    bottom: 50px;
+    width: 100%;
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    pointer-events: auto;
+  }
+
+  /* Tombol umum */
+  .controls button {
+    border: none;
+    outline: none;
+    border-radius: 50%;
+    transition: 0.2s;
+    cursor: pointer;
+  }
+
+  .controls button:active {
+    transform: scale(0.9);
+  }
+
+  /* Shutter */
+  #shutter {
+    width: 90px;
+    height: 90px;
+    background: white;
+    border: 5px solid rgba(200,200,200,0.5);
+    box-shadow: 0 0 10px rgba(255,255,255,0.7);
+  }
+
+  /* Rekam */
+  #recordBtn {
+    width: 70px;
+    height: 70px;
+    background: red;
+    box-shadow: 0 0 10px rgba(255,0,0,0.7);
+  }
+
+  /* Switch Kamera */
+  #switchBtn {
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.3);
+    font-size: 20px;
+    color: white;
+  }
+
+  /* Mode indicator */
+  #modeIndicator {
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 18px;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 15px;
+    border-radius: 20px;
+  }
+
+  #canvas { display: none; }
+</style>
+</head>
+<body>
+
+<video id="video" autoplay playsinline></video>
+
+<!-- Mode Foto / Video -->
+<div id="modeIndicator">Mode: Foto</div>
+
+<!-- Tombol floating -->
+<div class="controls">
+  <button id="switchBtn" onclick="switchCamera()">🔄</button>
+  <button id="shutter" onclick="takePhoto()"></button>
+  <button id="recordBtn" onclick="toggleRecord()">⏺</button>
+</div>
+
+<canvas id="canvas"></canvas>
+
+<script>
+let stream;
+let useBackCamera = true;
+let recorder;
+let chunks = [];
+let recording = false;
+
+// Mode: Foto / Video
+let mode = "Foto";
+const modeIndicator = document.getElementById("modeIndicator");
+
+async function startCamera() {
+  if(stream) stream.getTracks().forEach(t => t.stop());
+  stream = await navigator.mediaDevices.getUserMedia({
+    video: { facingMode: useBackCamera ? "environment" : "user" },
+    audio: true
+  });
+  document.getElementById("video").srcObject = stream;
+}
+
+function switchCamera() {
+  useBackCamera = !useBackCamera;
+  startCamera();
+}
+
+function takePhoto() {
+  mode = "Foto";
+  updateModeIndicator();
+  const canvas = document.getElementById("canvas");
+  const video = document.getElementById("video");
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  canvas.getContext("2d").drawImage(video,0,0);
+  const link = document.createElement("a");
+  link.href = canvas.toDataURL();
+  link.download = "foto.png";
+  link.click();
+}
+
+function toggleRecord() {
+  if(!recording) startRecord();
+  else stopRecord();
+}
+
+function startRecord() {
+  mode = "Video";
+  updateModeIndicator();
+  recorder = new MediaRecorder(stream);
+  chunks = [];
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    const blob = new Blob(chunks,{type:"video/mp4"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "video.mp4";
+    a.click();
+  }
+  recorder.start();
+  recording = true;
+  document.getElementById("recordBtn").style.background = "darkred";
+}
+
+function stopRecord() {
+  recorder.stop();
+  recording = false;
+  document.getElementById("recordBtn").style.background = "red";
+}
+
+function updateModeIndicator() {
+  modeIndicator.textContent = "Mode: " + mode;
+}
+
+// Start camera automatically
+startCamera();
+
+// Register service worker for PWA
+if("serviceWorker" in navigator){
+  navigator.serviceWorker.register("service-worker.js");
+}
+</script>
+
+</body>
+</html>
