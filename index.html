@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kamera App</title>
+<title>Kamera App - UI Modern</title>
 <link rel="manifest" href="manifest.json">
 
 <style>
@@ -22,58 +22,80 @@
     object-fit: cover;
   }
 
+  /* Floating Controls Container */
   .controls {
     position: absolute;
-    bottom: 40px;          /* tombol naik sedikit dari bawah */
-    left: 50%;
-    transform: translateX(-50%);
-    width: 90%;
+    bottom: 50px;
+    width: 100%;
     display: flex;
     justify-content: space-around;
     align-items: center;
     pointer-events: auto;
   }
 
+  /* Tombol umum */
   .controls button {
-    width: 60px;
-    height: 60px;
-    border-radius: 50%;
     border: none;
-    background: rgba(255,255,255,0.3);
-    color: white;
-    font-size: 20px;
+    outline: none;
+    border-radius: 50%;
     transition: 0.2s;
+    cursor: pointer;
   }
 
   .controls button:active {
-    background: white;
-    color: black;
     transform: scale(0.9);
   }
 
+  /* Shutter */
   #shutter {
-    width: 80px;
-    height: 80px;
+    width: 90px;
+    height: 90px;
     background: white;
-    border-radius: 50%;
     border: 5px solid rgba(200,200,200,0.5);
+    box-shadow: 0 0 10px rgba(255,255,255,0.7);
   }
 
+  /* Rekam */
   #recordBtn {
+    width: 70px;
+    height: 70px;
     background: red;
-    width: 60px;
-    height: 60px;
+    box-shadow: 0 0 10px rgba(255,0,0,0.7);
   }
 
-  #canvas {
-    display: none;
+  /* Switch Kamera */
+  #switchBtn {
+    width: 50px;
+    height: 50px;
+    background: rgba(255,255,255,0.3);
+    font-size: 20px;
+    color: white;
   }
+
+  /* Mode indicator */
+  #modeIndicator {
+    position: absolute;
+    top: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: white;
+    font-size: 18px;
+    background: rgba(0,0,0,0.5);
+    padding: 5px 15px;
+    border-radius: 20px;
+  }
+
+  #canvas { display: none; }
 </style>
 </head>
 <body>
 
 <video id="video" autoplay playsinline></video>
 
+<!-- Mode Foto / Video -->
+<div id="modeIndicator">Mode: Foto</div>
+
+<!-- Tombol floating -->
 <div class="controls">
   <button id="switchBtn" onclick="switchCamera()">🔄</button>
   <button id="shutter" onclick="takePhoto()"></button>
@@ -88,6 +110,10 @@ let useBackCamera = true;
 let recorder;
 let chunks = [];
 let recording = false;
+
+// Mode: Foto / Video
+let mode = "Foto";
+const modeIndicator = document.getElementById("modeIndicator");
 
 async function startCamera() {
   if(stream) stream.getTracks().forEach(t => t.stop());
@@ -104,6 +130,8 @@ function switchCamera() {
 }
 
 function takePhoto() {
+  mode = "Foto";
+  updateModeIndicator();
   const canvas = document.getElementById("canvas");
   const video = document.getElementById("video");
   canvas.width = video.videoWidth;
@@ -121,6 +149,8 @@ function toggleRecord() {
 }
 
 function startRecord() {
+  mode = "Video";
+  updateModeIndicator();
   recorder = new MediaRecorder(stream);
   chunks = [];
   recorder.ondataavailable = e => chunks.push(e.data);
@@ -143,10 +173,14 @@ function stopRecord() {
   document.getElementById("recordBtn").style.background = "red";
 }
 
-// Mulai kamera saat halaman dibuka
+function updateModeIndicator() {
+  modeIndicator.textContent = "Mode: " + mode;
+}
+
+// Start camera automatically
 startCamera();
 
-// Service Worker PWA
+// Register service worker for PWA
 if("serviceWorker" in navigator){
   navigator.serviceWorker.register("service-worker.js");
 }
