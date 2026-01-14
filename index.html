@@ -3,27 +3,27 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kamera App - UI Modern</title>
+<title>Kamera App - UI Lengkap</title>
 <link rel="manifest" href="manifest.json">
 
 <style>
-  body {
+body {
     margin: 0;
     font-family: Arial, sans-serif;
     background: #000;
     height: 100vh;
     overflow: hidden;
     position: relative;
-  }
+}
 
-  video {
+video {
     width: 100%;
     height: 100%;
     object-fit: cover;
-  }
+    transform: scaleX(1); /* default, akan mirror saat depan */
+}
 
-  /* Floating Controls Container */
-  .controls {
+.controls {
     position: absolute;
     bottom: 50px;
     width: 100%;
@@ -31,49 +31,44 @@
     justify-content: space-around;
     align-items: center;
     pointer-events: auto;
-  }
+}
 
-  /* Tombol umum */
-  .controls button {
+.controls button {
     border: none;
     outline: none;
     border-radius: 50%;
     transition: 0.2s;
     cursor: pointer;
-  }
+}
 
-  .controls button:active {
+.controls button:active {
     transform: scale(0.9);
-  }
+}
 
-  /* Shutter */
-  #shutter {
+#shutter {
     width: 90px;
     height: 90px;
     background: white;
     border: 5px solid rgba(200,200,200,0.5);
     box-shadow: 0 0 10px rgba(255,255,255,0.7);
-  }
+}
 
-  /* Rekam */
-  #recordBtn {
+#recordBtn {
     width: 70px;
     height: 70px;
     background: red;
     box-shadow: 0 0 10px rgba(255,0,0,0.7);
-  }
+}
 
-  /* Switch Kamera */
-  #switchBtn {
+#switchBtn, #galleryBtn {
     width: 50px;
     height: 50px;
     background: rgba(255,255,255,0.3);
     font-size: 20px;
     color: white;
-  }
+}
 
-  /* Mode indicator */
-  #modeIndicator {
+#modeIndicator {
     position: absolute;
     top: 30px;
     left: 50%;
@@ -83,23 +78,22 @@
     background: rgba(0,0,0,0.5);
     padding: 5px 15px;
     border-radius: 20px;
-  }
+}
 
-  #canvas { display: none; }
+#canvas { display: none; }
 </style>
 </head>
 <body>
 
 <video id="video" autoplay playsinline></video>
 
-<!-- Mode Foto / Video -->
 <div id="modeIndicator">Mode: Foto</div>
 
-<!-- Tombol floating -->
 <div class="controls">
-  <button id="switchBtn" onclick="switchCamera()">🔄</button>
-  <button id="shutter" onclick="takePhoto()"></button>
-  <button id="recordBtn" onclick="toggleRecord()">⏺</button>
+    <button id="switchBtn" onclick="switchCamera()">🔄</button>
+    <button id="shutter" onclick="takePhoto()"></button>
+    <button id="recordBtn" onclick="toggleRecord()">⏺</button>
+    <button id="galleryBtn" onclick="viewGallery()">📁</button>
 </div>
 
 <canvas id="canvas"></canvas>
@@ -110,79 +104,110 @@ let useBackCamera = true;
 let recorder;
 let chunks = [];
 let recording = false;
-
-// Mode: Foto / Video
 let mode = "Foto";
+
+let photos = []; // array menyimpan foto DataURL
+
+const video = document.getElementById("video");
 const modeIndicator = document.getElementById("modeIndicator");
 
 async function startCamera() {
-  if(stream) stream.getTracks().forEach(t => t.stop());
-  stream = await navigator.mediaDevices.getUserMedia({
-    video: { facingMode: useBackCamera ? "environment" : "user" },
-    audio: true
-  });
-  document.getElementById("video").srcObject = stream;
+    if(stream) stream.getTracks().forEach(t => t.stop());
+
+    stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: useBackCamera ? "environment" : "user" },
+        audio: true
+    });
+    video.srcObject = stream;
+
+    // Mirror saat kamera depan
+    video.style.transform = useBackCamera ? "scaleX(1)" : "scaleX(-1)";
 }
 
 function switchCamera() {
-  useBackCamera = !useBackCamera;
-  startCamera();
+    useBackCamera = !useBackCamera;
+    startCamera();
 }
 
 function takePhoto() {
-  mode = "Foto";
-  updateModeIndicator();
-  const canvas = document.getElementById("canvas");
-  const video = document.getElementById("video");
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  canvas.getContext("2d").drawImage(video,0,0);
-  const link = document.createElement("a");
-  link.href = canvas.toDataURL();
-  link.download = "foto.png";
-  link.click();
+    mode = "Foto";
+    updateModeIndicator();
+    const canvas = document.getElementById("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+
+    // Mirror untuk kamera depan
+    if(!useBackCamera){
+        ctx.translate(canvas.width, 0);
+        ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0);
+    if(!useBackCamera) ctx.setTransform(1,0,0,1,0,0);
+
+    const dataURL = canvas.toDataURL("image/png");
+    photos.push(dataURL); // simpan di array
+
+    const link = document.createElement("a");
+    link.href = dataURL;
+    link.download = "foto.png";
+    link.click();
 }
 
 function toggleRecord() {
-  if(!recording) startRecord();
-  else stopRecord();
+    if(!recording) startRecord();
+    else stopRecord();
 }
 
 function startRecord() {
-  mode = "Video";
-  updateModeIndicator();
-  recorder = new MediaRecorder(stream);
-  chunks = [];
-  recorder.ondataavailable = e => chunks.push(e.data);
-  recorder.onstop = () => {
-    const blob = new Blob(chunks,{type:"video/mp4"});
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "video.mp4";
-    a.click();
-  }
-  recorder.start();
-  recording = true;
-  document.getElementById("recordBtn").style.background = "darkred";
+    mode = "Video";
+    updateModeIndicator();
+    recorder = new MediaRecorder(stream);
+    chunks = [];
+    recorder.ondataavailable = e => chunks.push(e.data);
+    recorder.onstop = () => {
+        const blob = new Blob(chunks,{type:"video/mp4"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "video.mp4";
+        a.click();
+    }
+    recorder.start();
+    recording = true;
+    document.getElementById("recordBtn").style.background = "darkred";
 }
 
 function stopRecord() {
-  recorder.stop();
-  recording = false;
-  document.getElementById("recordBtn").style.background = "red";
+    recorder.stop();
+    recording = false;
+    document.getElementById("recordBtn").style.background = "red";
 }
 
 function updateModeIndicator() {
-  modeIndicator.textContent = "Mode: " + mode;
+    modeIndicator.textContent = "Mode: " + mode;
 }
 
-// Start camera automatically
+// Tombol Galeri
+function viewGallery(){
+    if(photos.length === 0){
+        alert("Belum ada foto");
+        return;
+    }
+    // Buka halaman baru menampilkan semua foto
+    const galleryWindow = window.open("", "_blank");
+    galleryWindow.document.write("<h2>Galeri Foto</h2>");
+    photos.forEach((src, i)=>{
+        galleryWindow.document.write(`<img src="${src}" style="width:100%;margin-bottom:10px;border:2px solid #fff;">`);
+    });
+}
+
+// Mulai kamera otomatis
 startCamera();
 
-// Register service worker for PWA
+// Service Worker PWA
 if("serviceWorker" in navigator){
-  navigator.serviceWorker.register("service-worker.js");
+    navigator.serviceWorker.register("service-worker.js");
 }
 </script>
 
