@@ -5,52 +5,68 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Kamera App</title>
 <link rel="manifest" href="manifest.json">
+
 <style>
   body {
     margin: 0;
-    font-family: Arial;
+    font-family: Arial, sans-serif;
     background: #000;
-    display: flex;
-    flex-direction: column;
     height: 100vh;
     overflow: hidden;
+    position: relative;
   }
 
   video {
-    flex: 1;
     width: 100%;
+    height: 100%;
     object-fit: cover;
   }
 
   .controls {
+    position: absolute;
+    bottom: 40px;          /* tombol naik sedikit dari bawah */
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
     display: flex;
     justify-content: space-around;
     align-items: center;
-    padding: 15px 0;
-    background: rgba(0,0,0,0.5);
+    pointer-events: auto;
   }
 
-  button {
+  .controls button {
     width: 60px;
     height: 60px;
     border-radius: 50%;
     border: none;
     background: rgba(255,255,255,0.3);
     color: white;
-    font-size: 16px;
+    font-size: 20px;
     transition: 0.2s;
   }
 
-  button:active {
+  .controls button:active {
     background: white;
     color: black;
     transform: scale(0.9);
   }
 
+  #shutter {
+    width: 80px;
+    height: 80px;
+    background: white;
+    border-radius: 50%;
+    border: 5px solid rgba(200,200,200,0.5);
+  }
+
   #recordBtn {
     background: red;
-    width: 70px;
-    height: 70px;
+    width: 60px;
+    height: 60px;
+  }
+
+  #canvas {
+    display: none;
   }
 </style>
 </head>
@@ -59,12 +75,12 @@
 <video id="video" autoplay playsinline></video>
 
 <div class="controls">
-  <button onclick="switchCamera()">🔄</button>
-  <button onclick="takePhoto()">📸</button>
+  <button id="switchBtn" onclick="switchCamera()">🔄</button>
+  <button id="shutter" onclick="takePhoto()"></button>
   <button id="recordBtn" onclick="toggleRecord()">⏺</button>
 </div>
 
-<canvas id="canvas" hidden></canvas>
+<canvas id="canvas"></canvas>
 
 <script>
 let stream;
@@ -79,7 +95,7 @@ async function startCamera() {
     video: { facingMode: useBackCamera ? "environment" : "user" },
     audio: true
   });
-  video.srcObject = stream;
+  document.getElementById("video").srcObject = stream;
 }
 
 function switchCamera() {
@@ -89,6 +105,7 @@ function switchCamera() {
 
 function takePhoto() {
   const canvas = document.getElementById("canvas");
+  const video = document.getElementById("video");
   canvas.width = video.videoWidth;
   canvas.height = video.videoHeight;
   canvas.getContext("2d").drawImage(video,0,0);
@@ -126,6 +143,7 @@ function stopRecord() {
   document.getElementById("recordBtn").style.background = "red";
 }
 
+// Mulai kamera saat halaman dibuka
 startCamera();
 
 // Service Worker PWA
