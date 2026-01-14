@@ -3,145 +3,274 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Kamera App Lengkap</title>
-<link rel="manifest" href="manifest.json">
+<title>Kamera App Pro</title>
+
 <style>
-body { margin:0; font-family:Arial,sans-serif; background:#000; height:100vh; overflow:hidden; position:relative; }
-video { width:100%; height:100%; object-fit:cover; transform: scaleX(1); }
-.controls { position:absolute; bottom:50px; width:100%; display:flex; justify-content:space-around; align-items:center; pointer-events:auto; }
-.controls button { border:none; outline:none; border-radius:50%; transition:0.2s; cursor:pointer; font-size:20px; }
-.controls button:active { transform: scale(0.9); }
-#shutter { width:90px; height:90px; background:white; border:5px solid rgba(200,200,200,0.5); box-shadow:0 0 10px rgba(255,255,255,0.7); }
-#recordBtn { width:70px; height:70px; background:red; box-shadow:0 0 10px rgba(255,0,0,0.7); }
-#switchBtn,#galleryBtn,#micBtn,#locationBtn,#flashBtn { width:50px; height:50px; background:rgba(255,255,255,0.3); color:white; }
-#zoomSlider { position:absolute; right:20px; bottom:120px; transform:rotate(-90deg); width:150px; }
-#modeIndicator { position:absolute; top:30px; left:50%; transform:translateX(-50%); color:white; font-size:18px; background:rgba(0,0,0,0.5); padding:5px 15px; border-radius:20px; }
-#canvas { display:none; }
+*{box-sizing:border-box}
+body{
+  margin:0;background:#000;color:#fff;
+  font-family:system-ui,Arial;
+  height:100vh;overflow:hidden;
+}
+video{
+  width:100%;height:100%;
+  object-fit:cover;
+}
+
+/* GRID */
+.grid::before,.grid::after{
+  content:"";position:absolute;
+  left:0;right:0;top:33.33%;bottom:33.33%;
+  border-top:1px solid rgba(255,255,255,.25);
+  border-bottom:1px solid rgba(255,255,255,.25);
+}
+.grid span{
+  position:absolute;top:0;bottom:0;
+  left:33.33%;right:33.33%;
+  border-left:1px solid rgba(255,255,255,.25);
+  border-right:1px solid rgba(255,255,255,.25);
+}
+
+/* FOCUS */
+.focus{
+  position:absolute;
+  width:60px;height:60px;
+  border:2px solid #ff0;
+  border-radius:8px;
+  pointer-events:none;
+  animation:focus 1s ease-out;
+}
+@keyframes focus{
+  0%{transform:scale(1.4);opacity:1}
+  100%{transform:scale(1);opacity:0}
+}
+
+/* TOP */
+.top-bar{
+  position:absolute;top:15px;
+  width:100%;padding:0 20px;
+  display:flex;justify-content:space-between;
+}
+.top-bar button{
+  background:none;border:none;
+  color:#fff;font-size:22px;
+}
+.dot{width:8px;height:8px;background:#0f0;border-radius:50%}
+
+/* ZOOM */
+.zoom{
+  position:absolute;bottom:170px;
+  width:100%;display:flex;
+  justify-content:center;gap:20px;
+}
+.zoom span{opacity:.6}
+.zoom .active{color:#ff9800;opacity:1}
+
+/* MODE */
+.modes{
+  position:absolute;bottom:120px;
+  width:100%;display:flex;
+  justify-content:center;gap:30px;
+}
+.modes .active{color:#ff9800}
+
+/* BOTTOM */
+.bottom{
+  position:absolute;bottom:20px;
+  width:100%;display:flex;
+  justify-content:space-between;
+  padding:0 25px;
+}
+.shutter{
+  width:80px;height:80px;
+  border:5px solid #fff;
+  border-radius:50%;
+  position:relative;
+}
+.shutter::after{
+  content:"";position:absolute;
+  inset:8px;border-radius:50%;
+  background:#fff;
+}
+.shutter.record{border-color:red}
+.shutter.record::after{
+  background:red;border-radius:12px;
+}
+.icon-btn{
+  background:none;border:none;
+  color:#fff;font-size:26px;
+}
 </style>
 </head>
+
 <body>
 
 <video id="video" autoplay playsinline></video>
-<div id="modeIndicator">Mode: Foto</div>
+<div class="grid"><span></span></div>
 
-<input type="range" id="zoomSlider" min="1" max="3" step="0.1" value="1" oninput="setZoom(this.value)">
-
-<div class="controls">
-  <button id="switchBtn" onclick="switchCamera()">🔄</button>
-  <button id="shutter" onclick="takePhoto()"></button>
-  <button id="recordBtn" onclick="toggleRecord()">⏺</button>
-  <button id="galleryBtn" onclick="viewGallery()">📁</button>
-  <button id="micBtn" onclick="toggleMic()">🎤</button>
-  <button id="locationBtn" onclick="getLocation()">📍</button>
-  <button id="flashBtn" onclick="toggleFlash()">⚡</button>
+<div class="top-bar">
+  <button onclick="toggleFlash()">⚡</button>
+  <div class="dot"></div>
 </div>
 
-<canvas id="canvas"></canvas>
+<div class="zoom">
+  <span onclick="zoomPreset(0.6)">0.6</span>
+  <span class="active" onclick="zoomPreset(1)">1x</span>
+  <span onclick="zoomPreset(2)">2</span>
+  <span onclick="zoomPreset(4)">4</span>
+</div>
+
+<div class="modes">
+  <span onclick="setMode('Video')">Video</span>
+  <span class="active" onclick="setMode('Foto')">Foto</span>
+</div>
+
+<div class="bottom">
+  <button class="icon-btn" onclick="viewGallery()">🖼</button>
+  <button id="shutter" class="shutter" onclick="shutterAction()"></button>
+  <button class="icon-btn" onclick="switchCamera()">🔄</button>
+</div>
+
+<canvas id="canvas" hidden></canvas>
 
 <script>
-let stream, useBackCamera=true, recorder, chunks=[], recording=false, mode="Foto", photos=[], micOn=true, trackZoom=1, flashOn=false;
+let stream,useBack=true,mode="Foto";
+let recorder,chunks=[],recording=false;
+let photos=JSON.parse(localStorage.getItem("photos")||"[]");
+
+let currentZoom=1,targetZoom=1;
+let lastTap=0,pinchStart=0;
+
 const video=document.getElementById("video");
-const modeIndicator=document.getElementById("modeIndicator");
-const micBtn=document.getElementById("micBtn");
-const flashBtn=document.getElementById("flashBtn");
+const shutter=document.getElementById("shutter");
 
 async function startCamera(){
   if(stream) stream.getTracks().forEach(t=>t.stop());
-  try{
-    stream=await navigator.mediaDevices.getUserMedia({
-      video:{ facingMode: useBackCamera?"environment":"user" },
-      audio:true
-    });
-    video.srcObject=stream;
-    video.style.transform=useBackCamera?"scaleX(1)":"scaleX(-1)";
-    micOn=true; updateMicButton();
-    trackZoom=1; updateZoom();
-    flashOn=false; updateFlashButton();
-  }catch(err){ alert("Izinkan kamera & mikrofon untuk menggunakan aplikasi"); }
+  stream=await navigator.mediaDevices.getUserMedia({
+    video:{facingMode:useBack?"environment":"user"},
+    audio:true
+  });
+  video.srcObject=stream;
 }
-
-function switchCamera(){ useBackCamera=!useBackCamera; startCamera(); }
-
-function takePhoto(){
-  mode="Foto"; updateModeIndicator();
-  const canvas=document.getElementById("canvas");
-  canvas.width=video.videoWidth; canvas.height=video.videoHeight;
-  const ctx=canvas.getContext("2d");
-  if(!useBackCamera){ ctx.translate(canvas.width,0); ctx.scale(-1,1); }
-  ctx.drawImage(video,0,0);
-  if(!useBackCamera) ctx.setTransform(1,0,0,1,0,0);
-  const dataURL=canvas.toDataURL("image/png");
-  photos.push(dataURL);
-  const link=document.createElement("a"); link.href=dataURL; link.download="foto.png"; link.click();
-}
-
-function toggleRecord(){ if(!recording) startRecord(); else stopRecord(); }
-function startRecord(){
-  mode="Video"; updateModeIndicator();
-  recorder=new MediaRecorder(stream);
-  chunks=[];
-  recorder.ondataavailable=e=>chunks.push(e.data);
-  recorder.onstop=()=>saveFile(new Blob(chunks,{type:"video/mp4"}),"video.mp4");
-  recorder.start(); recording=true; document.getElementById("recordBtn").style.background="darkred";
-}
-function stopRecord(){ recorder.stop(); recording=false; document.getElementById("recordBtn").style.background="red"; }
-
-function updateModeIndicator(){ modeIndicator.textContent="Mode: "+mode; }
-function viewGallery(){ 
-  if(photos.length===0){ alert("Belum ada foto"); return; }
-  const galleryWindow=window.open("","_blank");
-  galleryWindow.document.write("<h2>Galeri Foto</h2>");
-  photos.forEach(src=>galleryWindow.document.write(`<img src="${src}" style="width:100%;margin-bottom:10px;border:2px solid #fff;">`));
-}
-
-function getLocation(){
-  if(!navigator.geolocation){ alert("GPS tidak tersedia"); return; }
-  navigator.geolocation.getCurrentPosition(pos=>{
-    alert(`Latitude: ${pos.coords.latitude}\nLongitude: ${pos.coords.longitude}`);
-  },err=>alert("Gagal mendapatkan lokasi"));
-}
-
-// Mikrofon toggle
-function toggleMic(){ if(!stream) return; micOn=!micOn; stream.getAudioTracks().forEach(track=>track.enabled=micOn); updateMicButton(); }
-function updateMicButton(){ micBtn.style.background=micOn?"rgba(0,200,0,0.5)":"rgba(200,0,0,0.5)"; }
-
-// Zoom
-function setZoom(value){ trackZoom=parseFloat(value); updateZoom(); }
-function updateZoom(){
-  if(stream && stream.getVideoTracks()[0].applyConstraints){
-    stream.getVideoTracks()[0].applyConstraints({ advanced:[{zoom: trackZoom}] }).catch(()=>{});
-  }
-}
-
-// Flash / senter toggle
-function toggleFlash(){
-  flashOn=!flashOn;
-  updateFlashButton();
-  if(stream){
-    const track = stream.getVideoTracks()[0];
-    const capabilities = track.getCapabilities();
-    if(capabilities.torch){
-      track.applyConstraints({ advanced:[{torch: flashOn}] });
-    } else alert("Torch/flash tidak tersedia di kamera ini");
-  }
-}
-function updateFlashButton(){ flashBtn.style.background=flashOn?"rgba(255,255,0,0.5)":"rgba(255,255,255,0.3)"; }
-
-// Simpan file
-function saveFile(blob,filename){
-  if(window.showSaveFilePicker){
-    (async()=>{
-      const handle=await window.showSaveFilePicker({ suggestedName: filename });
-      const writable=await handle.createWritable(); await writable.write(blob); await writable.close();
-    })();
-  } else {
-    const link=document.createElement("a");
-    link.href=URL.createObjectURL(blob); link.download=filename; link.click();
-  }
-}
-
 startCamera();
-if("serviceWorker" in navigator){ navigator.serviceWorker.register("service-worker.js"); }
+
+function switchCamera(){useBack=!useBack;startCamera()}
+
+/* MODE */
+function setMode(m){
+  if(recording) return;
+  mode=m;
+  document.querySelectorAll(".modes span").forEach(e=>e.classList.remove("active"));
+  event.target.classList.add("active");
+}
+
+/* SHUTTER */
+function shutterAction(){
+  mode==="Foto"?takePhoto():toggleRecord();
+}
+
+/* PHOTO */
+function takePhoto(){
+  const c=document.getElementById("canvas");
+  c.width=video.videoWidth;c.height=video.videoHeight;
+  c.getContext("2d").drawImage(video,0,0);
+  const img=c.toDataURL("image/png");
+  photos.push(img);
+  localStorage.setItem("photos",JSON.stringify(photos));
+}
+
+/* VIDEO */
+function toggleRecord(){
+  if(!recording){
+    recorder=new MediaRecorder(stream,{mimeType:"video/webm"});
+    chunks=[];
+    recorder.ondataavailable=e=>chunks.push(e.data);
+    recorder.onstop=()=>{
+      const b=new Blob(chunks,{type:"video/webm"});
+      const a=document.createElement("a");
+      a.href=URL.createObjectURL(b);
+      a.download="video.webm";a.click();
+    };
+    recorder.start();
+    recording=true;
+    shutter.classList.add("record");
+  }else{
+    recorder.stop();
+    recording=false;
+    shutter.classList.remove("record");
+  }
+}
+
+/* ZOOM SMOOTH */
+function zoomPreset(z){
+  targetZoom=z;
+  document.querySelectorAll(".zoom span").forEach(s=>s.classList.remove("active"));
+  event.target.classList.add("active");
+}
+
+function animateZoom(){
+  if(!stream) return requestAnimationFrame(animateZoom);
+  if(Math.abs(currentZoom-targetZoom)>0.01){
+    currentZoom+= (targetZoom-currentZoom)*0.15;
+    const track=stream.getVideoTracks()[0];
+    track.applyConstraints({advanced:[{zoom:currentZoom}]}).catch(()=>{});
+  }
+  requestAnimationFrame(animateZoom);
+}
+animateZoom();
+
+/* DOUBLE TAP ZOOM */
+video.addEventListener("click",e=>{
+  const now=Date.now();
+  if(now-lastTap<300){
+    targetZoom = targetZoom<1 ? 1 : targetZoom<2 ? 2 : 0.6;
+  }
+  lastTap=now;
+});
+
+/* PINCH ZOOM */
+video.addEventListener("touchstart",e=>{
+  if(e.touches.length===2){
+    pinchStart=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+  }
+});
+video.addEventListener("touchmove",e=>{
+  if(e.touches.length===2){
+    const d=Math.hypot(
+      e.touches[0].clientX-e.touches[1].clientX,
+      e.touches[0].clientY-e.touches[1].clientY
+    );
+    targetZoom=Math.min(4,Math.max(0.6,targetZoom+(d-pinchStart)/300));
+    pinchStart=d;
+  }
+});
+
+/* TAP TO FOCUS */
+video.addEventListener("click",e=>{
+  const f=document.createElement("div");
+  f.className="focus";
+  f.style.left=e.clientX-30+"px";
+  f.style.top=e.clientY-30+"px";
+  document.body.appendChild(f);
+  setTimeout(()=>f.remove(),1000);
+});
+
+/* FLASH */
+function toggleFlash(){
+  const t=stream.getVideoTracks()[0];
+  if(!t.getCapabilities().torch) return alert("Flash tidak tersedia");
+  t.applyConstraints({advanced:[{torch:!t.torchOn}]});
+  t.torchOn=!t.torchOn;
+}
+
+function viewGallery(){
+  if(!photos.length) return alert("Belum ada foto");
+  const w=open();
+  photos.forEach(p=>w.document.write(`<img src="${p}" style="width:100%">`));
+}
 </script>
 
 </body>
